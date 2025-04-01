@@ -2,6 +2,7 @@ from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, E
 from sqlalchemy.dialects.mysql import LONGTEXT
 from sqlalchemy.orm import relationship
 from config.db import Base
+from datetime import datetime
 import enum
 
 
@@ -35,17 +36,16 @@ class MyNivel(str, enum.Enum):
 class Membresia(Base):
     __tablename__ = "tbc_membresias"
 
-    ID= Column(Integer, primary_key=True, index=True)
-    Codigo = Column(String(50))
-    Tipo = Column(Enum(MyTipo))
-    Tipo_Servicios = Column( Enum(MyTipoServicios))
-    Tipo_Plan = Column( Enum(MyTipoPlan))
-    Nivel = Column(Enum(MyNivel))
-    Fecha_Inicio = Column(DateTime)
-    Fecha_Fin = Column(DateTime)
-    Estatus = Column(Boolean, default=False)
-    Fecha_Registro = Column(DateTime)
-    Fecha_Actualizacion = Column(DateTime)
+    ID = Column(Integer, primary_key=True, autoincrement=True, nullable=False)
+    Codigo = Column(String(50), nullable=False, unique=True)
+    Tipo = Column(Enum(MyTipo), nullable=False)
+    Tipo_Servicios = Column(Enum(MyTipoServicios), nullable=False)
+    Tipo_Plan = Column(Enum(MyTipoPlan), nullable=False)
+    Nivel = Column(Enum(MyNivel), nullable=False, default=MyNivel.Nuevo)
+    Fecha_Inicio = Column(DateTime, nullable=False)
+    Fecha_Fin = Column(DateTime, nullable=True)
+    Estatus = Column(Boolean, default=True, nullable=False)
+    Fecha_Registro = Column(DateTime, nullable=False, default=datetime.now)
+    Fecha_Actualizacion = Column(DateTime, nullable=True, onupdate=datetime.now)
+    
     #items = relationship("Item", back_populates="owner") Clave Foranea
-
-
