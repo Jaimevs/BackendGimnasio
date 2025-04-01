@@ -5,3 +5,6 @@
 __pycache__/
 *.py[cod]
 *$py.class
+
+# Ignorar el archivo de registros pendientes
+pending_registrations.json
