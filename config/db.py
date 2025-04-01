@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 #configuracion de la base de datosm en aiven
-#SQLALCHEMY_DATABASE_URL = "mysql+pymysql://avnadmin:AVNS_TUUjXCnZQAQk-kZ2VKZ@mysql-270c42e9-lorenaascencion2003-2691.d.aivencloud.com:10171/defaultdb"
+
 SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL")
 #  Conexión local
 engine = create_engine(SQLALCHEMY_DATABASE_URL)
