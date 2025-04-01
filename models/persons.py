@@ -22,14 +22,8 @@ class TipoSangre(str, enum.Enum):
 class Person(Base):
     __tablename__ = 'tbb_personas'
     
-    # ID con autoincremento y not null
     ID = Column(Integer, primary_key=True, autoincrement=True, nullable=False)
-    
-    # La clave foránea que apunta a User
-    # Esta es la columna que establece la relación uno a uno
     Usuario_ID = Column(Integer, ForeignKey('tbb_usuarios.ID'), nullable=True, unique=True)
-    
-    # Resto de campos
     Titulo_Cortesia = Column(String(20), nullable=True)
     Nombre = Column(String(80), nullable=False)
     Primer_Apellido = Column(String(80), nullable=False)
