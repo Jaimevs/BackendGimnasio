@@ -9,6 +9,8 @@ from routes.promociones import promocion_router
 from routes.opinion_cliente import opinion_cliente_router
 from routes.membresias import membresia
 from routes.servicios_clientes import servicio_cliente
+from routes.ejercicios import ejercicio
+from routes.entrenamientos import entrenamiento
 from fastapi.middleware.cors import CORSMiddleware
 
 
@@ -36,4 +38,6 @@ app.include_router(promocion_router)
 app.include_router(opinion_cliente_router)
 app.include_router(membresia)
 app.include_router(servicio_cliente)
+app.include_router(ejercicio)
+app.include_router(entrenamiento)
 app.include_router(google_auth_router)
