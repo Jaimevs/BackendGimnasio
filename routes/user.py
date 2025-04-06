@@ -1,3 +1,4 @@
+from fastapi import status
 from fastapi import APIRouter,HTTPException, Depends
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
@@ -9,6 +10,17 @@ from jwt_config import solicita_token, valida_token
 from portadortoken import Portador
 from gmail_service import send_verification_email
 from token_verification import store_pending_registration, get_pending_registration, verify_code
+from pydantic import BaseModel
+from security import verify_password, hash_password
+from datetime import datetime
+
+# Modelos de datos para las peticiones
+class PasswordChangeRequest(BaseModel):
+    new_password: str
+
+class PasswordHashResponse(BaseModel):
+    password_hash: str
+    is_google_account: bool = False
 
 key = Fernet.generate_key()
 f = Fernet(key)
@@ -28,57 +40,8 @@ def get_db():
 def bienvenido():
     return 'Bienvenido al sistema de APIs'
 
-# Ruta para obtener todos los usuarios
-@user.get('/users/', response_model=List[schemas.users.User],tags=['Usuarios'], dependencies=[Depends(Portador())])
-def read_users(skip: int=0, limit: int=10, db: Session=Depends(get_db)):
-    db_users = crud.users.get_users(db=db,skip=skip, limit=limit)
-    return db_users
 
-# Ruta para obtener un usuario por ID
-@user.post("/user/{id}", response_model=schemas.users.User, tags=["Usuarios"], dependencies=[Depends(Portador())])
-def read_user(id: int, db: Session = Depends(get_db)):
-    db_user= crud.users.get_user(db=db, id=id)
-    if db_user is None:
-        raise HTTPException(status_code=404, detail="User not found")
-    return db_user
-
-# Ruta para crear un usurio
-@user.post('/users/', response_model=schemas.users.User,tags=['Usuarios'])
-def create_user(user: schemas.users.UserCreate, db: Session=Depends(get_db)):
-    db_users = crud.users.get_user_by_usuario(db,usuario=user.Nombre_Usuario)
-    if db_users:
-        raise HTTPException(status_code=400, detail="Usuario existente intenta nuevamente")
-    return crud.users.create_user(db=db, user=user)
-
-# Ruta para actualizar un usuario
-@user.put('/users/{id}', response_model=schemas.users.User,tags=['Usuarios'], dependencies=[Depends(Portador())])
-def update_user(id:int,user: schemas.users.UserUpdate, db: Session=Depends(get_db)):
-    db_users = crud.users.update_user(db=db, id=id, user=user)
-    if db_users is None:
-        raise HTTPException(status_code=404, detail="Usuario no existe, no se pudo actualizar ")
-    return db_users
-
-# Ruta para eliminar un usuario
-@user.delete('/users/{id}', response_model=schemas.users.User,tags=['Usuarios'], dependencies=[Depends(Portador())])
-def delete_user(id:int, db: Session=Depends(get_db)):
-    db_users = crud.users.delete_user(db=db, id=id)
-    if db_users is None:
-        raise HTTPException(status_code=404, detail="Usuario no existe, no se pudo eliminar ")
-    return db_users
-'''
-@user.post('/login/', response_model=schemas.users.UserLogin, tags=['User Login'])
-def read_credentials(usuario:schemas.users.UserLogin, db: Session = Depends(get_db)):
-    db_credentials = crud.users.get_user_by_creentials(db, username=usuario.Nombre_Usuario,
-                                                       correo=usuario.Correo_Electronico,
-                                                       telefono=usuario.Numero_Telefonico_Movil,
-                                                       password=usuario.Contrasena)
-    if db_credentials is None:
-        return JSONResponse(content={'mensaje':'Acceso denegado'},status_code=404)
-    token:str=solicita_token(usuario.dict())
-    return JSONResponse(status_code=200, content=token)
-'''
-
-#Ruta abierta para registro normla de un usuario
+#Ruta abierta para registro de un usuario
 @user.post('/users/register/', tags=['Usuarios'])
 async def register_user(user: schemas.users.UserCreateRequest, db: Session=Depends(get_db)):
     # Verificar si ya existe el usuario
@@ -151,7 +114,6 @@ def verify_user_by_code(verification: schemas.users.UserVerifyByCode, db: Sessio
     
     return new_user
 
-#Login de usuario
 @user.post('/login/', response_model=None, tags=['User Login'])
 def read_credentials(usuario: schemas.users.UserLogin, db: Session = Depends(get_db)):
     db_user = crud.users.get_user_by_email_password(
@@ -161,7 +123,21 @@ def read_credentials(usuario: schemas.users.UserLogin, db: Session = Depends(get
     )
     
     if db_user is None:
-        return JSONResponse(content={'mensaje':'Acceso denegado'}, status_code=404)
+        return JSONResponse(content={'mensaje':'Credenciales incorrectas'}, status_code=401)
+    
+    # Depuración: imprimir atributos disponibles
+    print(f"Atributos del usuario: {dir(db_user)}")
+    
+    # Intentar verificar si es un usuario de Google de manera segura
+    try:
+        # Buscar el atributo que almacena el ID de Google (google_id, googleId, etc.)
+        # Imprime todos los atributos que contienen la palabra "google" en su nombre
+        google_attrs = [attr for attr in dir(db_user) if 'google' in attr.lower()]
+        print(f"Posibles atributos de Google: {google_attrs}")
+        
+        # No usar el atributo Google_ID hasta encontrar el nombre correcto
+    except Exception as e:
+        print(f"Error al buscar atributos de Google: {str(e)}")
     
     # Obtener los roles del usuario
     roles_names = [rol.Nombre for rol in db_user.roles] if db_user.roles else ["usuario"]
@@ -210,3 +186,49 @@ def get_users_by_role(db: Session = Depends(get_db), token: str = Depends(Portad
         if db_user is None:
             raise HTTPException(status_code=404, detail="Usuario no encontrado")
         return [db_user]
+
+
+@user.post('/users/change-password', tags=['Usuarios']) 
+def change_password(
+    password_data: PasswordChangeRequest, 
+    db: Session = Depends(get_db), 
+    token_data: dict = Depends(Portador())
+):
+    # Obtener el ID del usuario del token
+    user_id = token_data.get("ID")
+    if not user_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token inválido: no contiene ID de usuario"
+        )
+    
+    # Buscar el usuario en la base de datos
+    db_user = crud.users.get_user(db, id=user_id)
+    if not db_user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail="Usuario no encontrado"
+        )
+    
+    # Depuración: imprimir atributos disponibles
+    print(f"Atributos del usuario: {dir(db_user)}")
+    
+    # Intentar determinar el nombre correcto del atributo de Google ID
+    google_attrs = [attr for attr in dir(db_user) if 'google' in attr.lower()]
+    print(f"Posibles atributos de Google: {google_attrs}")
+    
+    # Generar hash de la nueva contraseña
+    hashed_password = hash_password(password_data.new_password)
+    
+    # Actualizar la contraseña
+    db_user.Contrasena = hashed_password
+    db_user.Fecha_Actualizacion = datetime.now()
+    
+    # No intentaremos configurar Tipo_Autenticacion hasta conocer los nombres correctos
+    
+    db.commit()
+    
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content={"mensaje": "Contraseña actualizada correctamente"}
+    )

@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-
+from routes.google_auth import router as google_auth_router
 from routes.person import person
 from routes.rol import rol
 from routes.user import user
@@ -15,10 +15,15 @@ from fastapi.middleware.cors import CORSMiddleware
 app = FastAPI()
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "http://localhost:5173",  # Tu URL de desarrollo
+        "https://localhost:5173",
+        "http://localhost:3000",  # Otros puertos comunes
+        "https://gym-customer.onrender.com"  # Añade tu dominio de producción
+    ],
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["*"],  # Permite todos los métodos
+    allow_headers=["*"],  # Permite todos los headers
 )
 
 # TABLAS CON RELACIÓN 
@@ -31,3 +36,4 @@ app.include_router(promocion_router)
 app.include_router(opinion_cliente_router)
 app.include_router(membresia)
 app.include_router(servicio_cliente)
+app.include_router(google_auth_router)

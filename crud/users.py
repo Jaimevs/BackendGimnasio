@@ -1,5 +1,7 @@
 import models.users
 import schemas.users
+import secrets
+import string
 from sqlalchemy.orm import Session
 import models, schemas
 from security import hash_password
@@ -97,3 +99,34 @@ def get_user_by_email_password(db: Session, email: str, password: str):
     if user and verify_password(password, user.Contrasena):
         return user
     return None
+
+def create_user_google(db: Session, user: schemas.users.UserCreate):
+    """
+    Create a new user with Google authentication
+    Generates a random password since this user will authenticate via Google
+    """
+    # Generate a random secure password
+    alphabet = string.ascii_letters + string.digits + string.punctuation
+    random_password = ''.join(secrets.choice(alphabet) for i in range(20))
+    
+    # Hash the random password using the same function as regular users
+    hashed_password = hash_password(random_password)
+    
+    # Create the user object
+    db_user = models.users.User(
+        Nombre_Usuario=user.Nombre_Usuario,
+        Correo_Electronico=user.Correo_Electronico,
+        Contrasena=hashed_password,  # Store the hashed random password
+        Numero_Telefonico_Movil=user.Numero_Telefonico_Movil or "",
+        Estatus=user.Estatus,
+        Google_ID=user.Google_ID,  # This field is already in your schema
+        Foto_Perfil=user.Foto_Perfil,  # This field is already in your schema
+        Fecha_Registro=user.Fecha_Registro,
+        Fecha_Actualizacion=user.Fecha_Actualizacion
+    )
+    
+    # Add to database
+    db.add(db_user)
+    db.commit()
+    db.refresh(db_user)
+    return db_user
