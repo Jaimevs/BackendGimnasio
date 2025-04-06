@@ -19,6 +19,9 @@ class User(Base):
     Contrasena = Column(String(255), nullable=False)
     Numero_Telefonico_Movil = Column(String(20), nullable=True)
     Estatus = Column(Enum(MyEstatus), nullable=False, default=MyEstatus.Activo)
+    # Add these two fields for Google authentication
+    Google_ID = Column(String(100), nullable=True)
+    Foto_Perfil = Column(String(255), nullable=True)
     Fecha_Registro = Column(DateTime, nullable=False, default=datetime.now)
     Fecha_Actualizacion = Column(DateTime, nullable=True, onupdate=datetime.now)
     
