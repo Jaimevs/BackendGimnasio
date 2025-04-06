@@ -54,6 +54,11 @@ async def register_user(user: schemas.users.UserCreateRequest, db: Session=Depen
     if email_exists:
         raise HTTPException(status_code=400, detail="Correo electrónico ya registrado")
     
+    # Modificación: Establecer un valor por defecto para Numero_Telefonico_Movil
+    # Esto evitará el error de validación si no se proporciona un número
+    if not user.Numero_Telefonico_Movil:
+        user.Numero_Telefonico_Movil = ""  # Establecer como string vacío
+    
     # Enviar email con código de verificación
     result = await send_verification_email(user.Correo_Electronico, "")
     
@@ -66,7 +71,12 @@ async def register_user(user: schemas.users.UserCreateRequest, db: Session=Depen
     
     # Almacenar datos de usuario y código de verificación
     verification_code = result.get('verification_code')
-    token = store_pending_registration(user.dict(), verification_code)
+    
+    # Convertir el modelo Pydantic a un diccionario, asegurándose de manejar Numero_Telefonico_Movil
+    user_dict = user.dict()
+    user_dict['Numero_Telefonico_Movil'] = user_dict.get('Numero_Telefonico_Movil', '')
+    
+    token = store_pending_registration(user_dict, verification_code)
     
     return {
         "message": "Se ha enviado un código de verificación a tu correo electrónico.",
@@ -90,6 +100,10 @@ def verify_user_by_code(verification: schemas.users.UserVerifyByCode, db: Sessio
         
     if "Fecha_Actualizacion" not in user_data or user_data["Fecha_Actualizacion"] is None:
         user_data["Fecha_Actualizacion"] = current_time
+    
+    # Asegurar que Numero_Telefonico_Movil sea un string
+    if "Numero_Telefonico_Movil" not in user_data or user_data["Numero_Telefonico_Movil"] is None:
+        user_data["Numero_Telefonico_Movil"] = ""
     
     # Crear usuario con los datos almacenados
     user = schemas.users.UserCreate(**user_data)
