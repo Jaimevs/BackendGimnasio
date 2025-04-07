@@ -62,10 +62,28 @@ def update_clase(db: Session, id: int, clase: schemas.clases.ClaseUpdate):
 
 # Eliminar clase por ID
 def delete_clase(db: Session, id: int):
+    # Primero, obtener la clase para verificar que existe
     db_clase = db.query(models.clases.Clase).filter(models.clases.Clase.ID == id).first()
+    
     if db_clase:
+        # Eliminar primero todas las reservaciones asociadas a esta clase
+        reservaciones = db.query(models.reservaciones.Reservacion).filter(
+            models.reservaciones.Reservacion.Clase_ID == id
+        ).all()
+        
+        # Registrar el número de reservaciones que se eliminarán
+        num_reservaciones = len(reservaciones)
+        
+        # Eliminar cada reservación
+        for reservacion in reservaciones:
+            db.delete(reservacion)
+        
+        # Ahora eliminar la clase
         db.delete(db_clase)
         db.commit()
+        
+        print(f"Clase ID {id} eliminada junto con {num_reservaciones} reservaciones asociadas")
+    
     return db_clase
 
 # Función para obtener detalles de clase con información del entrenador
