@@ -21,3 +21,4 @@ class Clase(Base):
     
     # Relaciones
     entrenador = relationship("User", foreign_keys=[Entrenador_ID], back_populates="clases")
+    quejas = relationship("Queja", back_populates="clase", overlaps="reservaciones")
