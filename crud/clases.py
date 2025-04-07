@@ -1,8 +1,8 @@
-# crud/clases.py
 from sqlalchemy.orm import Session
 import models.clases
 import models.users
 import models.persons
+import models.quejas
 import schemas.clases
 from datetime import datetime
 
@@ -61,28 +61,39 @@ def update_clase(db: Session, id: int, clase: schemas.clases.ClaseUpdate):
     return db_clase
 
 # Eliminar clase por ID
+# Eliminar clase por ID
 def delete_clase(db: Session, id: int):
     # Primero, obtener la clase para verificar que existe
     db_clase = db.query(models.clases.Clase).filter(models.clases.Clase.ID == id).first()
     
     if db_clase:
-        # Eliminar primero todas las reservaciones asociadas a esta clase
+        # Eliminar quejas asociadas a esta clase
+        quejas = db.query(models.quejas.Queja).filter(
+            models.quejas.Queja.Clase_ID == id
+        ).all()
+        
+        num_quejas = len(quejas)
+        for queja in quejas:
+            db.delete(queja)
+            
+        print(f"Se eliminaron {num_quejas} quejas asociadas a la clase ID {id}")
+        
+        # Eliminar reservaciones asociadas a esta clase
         reservaciones = db.query(models.reservaciones.Reservacion).filter(
             models.reservaciones.Reservacion.Clase_ID == id
         ).all()
         
-        # Registrar el número de reservaciones que se eliminarán
         num_reservaciones = len(reservaciones)
-        
-        # Eliminar cada reservación
         for reservacion in reservaciones:
             db.delete(reservacion)
+            
+        print(f"Se eliminaron {num_reservaciones} reservaciones asociadas a la clase ID {id}")
         
-        # Ahora eliminar la clase
+        # Finalmente eliminar la clase
         db.delete(db_clase)
         db.commit()
         
-        print(f"Clase ID {id} eliminada junto con {num_reservaciones} reservaciones asociadas")
+        print(f"Clase ID {id} eliminada correctamente junto con sus relaciones")
     
     return db_clase
 
