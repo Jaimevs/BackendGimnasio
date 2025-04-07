@@ -13,7 +13,6 @@ from datetime import datetime
 
 clase_router = APIRouter()
 
-# Crear la tabla
 models.clases.Base.metadata.create_all(bind=engine)
 
 # Ruta para obtener todas las clases (solo administradores)
@@ -163,3 +162,63 @@ def delete_clase(id: int, db: Session = Depends(get_db), token_data = Depends(Po
         raise HTTPException(status_code=403, detail="Solo puedes eliminar tus propias clases")
     
     return crud.clases.delete_clase(db=db, id=id)
+
+#Para visualizar todas las clases que exsiten
+@clase_router.get('/clases/with-details/', tags=['Clases'], dependencies=[Depends(Portador())])
+def read_clases_with_details(skip: int = 0, limit: int = 10, db: Session = Depends(get_db)):
+    db_clases = crud.clases.get_clases_with_entrenador(db=db, skip=skip, limit=limit)
+    return db_clases
+
+# Ruta para obtener una clase por ID con detalles del entrenador
+@clase_router.get('/clases/{id}/with-details/', tags=['Clases'], dependencies=[Depends(Portador())])
+def read_clase_with_details(id: int, db: Session = Depends(get_db)):
+    db_clase = crud.clases.get_clase_with_entrenador_details(db=db, clase_id=id)
+    if db_clase is None:
+        raise HTTPException(status_code=404, detail="Clase no encontrada")
+    return db_clase
+
+# Ruta para obtener clases por entrenador
+@clase_router.get('/clases/entrenador/{entrenador_id}', response_model=List[schemas.clases.Clase], tags=['Clases'], dependencies=[Depends(Portador())])
+def read_clases_by_entrenador(entrenador_id: int, skip: int = 0, limit: int = 10, db: Session = Depends(get_db)):
+    db_clases = crud.clases.get_clases_by_entrenador(db=db, entrenador_id=entrenador_id, skip=skip, limit=limit)
+    return db_clases
+
+# Ruta para obtener clases del entrenador actual
+@clase_router.get('/mis-clases/', response_model=List[schemas.clases.Clase], tags=['Clases'])
+def read_mis_clases(skip: int = 0, limit: int = 10, db: Session = Depends(get_db), token: str = Depends(Portador())):
+    token_data = decode_token(token)
+    user_id = token_data.get("user_id") or token_data.get("ID")
+    
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Token inválido o expirado")
+    
+    # Verificar que el usuario tenga rol de entrenador
+    user = db.query(models.users.User).filter(models.users.User.ID == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    
+    # Verificar si tiene rol de entrenador
+    is_entrenador = False
+    for rol in user.roles:
+        if rol.Nombre == "entrenador":
+            is_entrenador = True
+            break
+    
+    if not is_entrenador:
+        raise HTTPException(status_code=403, detail="Solo los entrenadores pueden ver sus clases")
+    
+    return crud.clases.get_clases_by_entrenador(db=db, entrenador_id=user_id, skip=skip, limit=limit)
+
+# Ruta para obtener todas las clases
+@clase_router.get('/clases/', response_model=List[schemas.clases.Clase], tags=['Clases'], dependencies=[Depends(Portador())])
+def read_clases(skip: int = 0, limit: int = 10, db: Session = Depends(get_db)):
+    db_clases = crud.clases.get_clases(db=db, skip=skip, limit=limit)
+    return db_clases
+
+# Ruta para obtener una clase por ID
+@clase_router.get('/clases/{id}', response_model=schemas.clases.Clase, tags=['Clases'], dependencies=[Depends(Portador())])
+def read_clase(id: int, db: Session = Depends(get_db)):
+    db_clase = crud.clases.get_clase(db=db, id=id)
+    if db_clase is None:
+        raise HTTPException(status_code=404, detail="Clase no encontrada")
+    return db_clase
