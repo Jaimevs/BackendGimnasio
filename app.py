@@ -13,6 +13,7 @@ from routes.ejercicios import ejercicio
 from routes.entrenamientos import entrenamiento
 from routes.clases import clase_router
 from routes.quejas import feedback_router
+from routes.opinion_cliente import opinion_cliente_router
 from fastapi.middleware.cors import CORSMiddleware
 from routes.reservaciones import reservacion_router
 
@@ -44,6 +45,7 @@ app.include_router(servicio_cliente)
 app.include_router(ejercicio)
 app.include_router(entrenamiento)
 app.include_router(clase_router)
+app.include_router(opinion_cliente_router)
 app.include_router(feedback_router)
 app.include_router(reservacion_router)
 app.include_router(google_auth_router)
