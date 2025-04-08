@@ -2,6 +2,7 @@ from sqlalchemy.orm import Session
 import models.quejas
 import models.clases
 import models.users
+import models.persons
 import schemas.quejas
 from datetime import datetime
 
