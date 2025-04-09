@@ -11,3 +11,8 @@ pending_registrations.json
 
 # Entorno virtual
 BackendGym/
+
+# Logs
+nohup.out
+
+
