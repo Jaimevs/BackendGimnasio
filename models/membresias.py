@@ -37,6 +37,7 @@ class Membresia(Base):
     __tablename__ = "tbc_membresias"
 
     ID = Column(Integer, primary_key=True, autoincrement=True, nullable=False)
+    Usuario_ID = Column(Integer, ForeignKey("tbd_usuarios_roles.Usuario_ID"), nullable=False)
     Codigo = Column(String(50), nullable=False, unique=True)
     Tipo = Column(Enum(MyTipo), nullable=False)
     Tipo_Servicios = Column(Enum(MyTipoServicios), nullable=False)
@@ -48,4 +49,5 @@ class Membresia(Base):
     Fecha_Registro = Column(DateTime, nullable=False, default=datetime.now)
     Fecha_Actualizacion = Column(DateTime, nullable=True, onupdate=datetime.now)
     
-    #items = relationship("Item", back_populates="owner") Clave Foranea
+    # Relaciones
+    usuario_rol = relationship("UserRol", foreign_keys=[Usuario_ID])

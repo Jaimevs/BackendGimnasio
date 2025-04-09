@@ -23,6 +23,9 @@ def solicita_token(dato: dict, roles: list = None) -> dict:
     }
 
 def valida_token(token: str) -> dict:
+    if isinstance(token, str):
+        token = token.encode('utf-8')
+
     dato: dict = decode(token, key='mi_clave', algorithms=['HS256'])
     return dato
 

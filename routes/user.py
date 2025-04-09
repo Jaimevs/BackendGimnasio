@@ -13,6 +13,9 @@ from token_verification import store_pending_registration, get_pending_registrat
 from pydantic import BaseModel
 from security import verify_password, hash_password
 from datetime import datetime
+import jwt
+from jwt.exceptions import ExpiredSignatureError, InvalidTokenError
+from typing import Union
 
 # Modelos de datos para las peticiones
 class PasswordChangeRequest(BaseModel):
@@ -34,6 +37,13 @@ def get_db():
         yield db
     finally:
         db.close()
+
+class UserWithRolesResponse(BaseModel):
+    ID: int
+    Nombre_Usuario: str
+    Correo_Electronico: str
+    Roles: List[str]
+    Estatus: str
         
 # Ruta de bienvenida
 @user.get('/')
@@ -246,3 +256,315 @@ def change_password(
         status_code=status.HTTP_200_OK,
         content={"mensaje": "Contraseña actualizada correctamente"}
     )
+
+
+###Edpoint para administrador###
+@user.get('/users-with-roles/', response_model=List[UserWithRolesResponse], tags=['Usuarios'])
+def get_all_users_with_roles(
+    db: Session = Depends(get_db), 
+    token_data: dict = Depends(Portador())
+):
+    try:
+        # Imprimir los datos del token para depuración
+        print(f"Datos del token: {token_data}")
+        
+        # Obtener roles del token
+        user_roles = token_data.get("roles", [])
+        
+        # Verificar si el usuario es admin
+        if "admin" not in user_roles and "administrador" not in user_roles:
+            raise HTTPException(
+                status_code=403, 
+                detail="No tienes permisos para ver todos los usuarios"
+            )
+        
+        # Obtener todos los usuarios
+        users = db.query(models.users.User).all()
+        
+        # Preparar respuesta con roles
+        users_with_roles = []
+        for user in users:
+            # Obtener nombres de roles
+            roles = [rol.Nombre for rol in user.roles] if user.roles else []
+            
+            users_with_roles.append(UserWithRolesResponse(
+                ID=user.ID,
+                Nombre_Usuario=user.Nombre_Usuario,
+                Correo_Electronico=user.Correo_Electronico,
+                Roles=roles,
+                Estatus=user.Estatus.value if user.Estatus else None
+            ))
+        
+        return users_with_roles
+    
+    except Exception as e:
+        # Capturar y loguear cualquier error
+        print(f"Error al procesar token: {str(e)}")
+        raise HTTPException(
+            status_code=401, 
+            detail=f"Error de autenticación: {str(e)}"
+        )@user.get('/users-with-roles/', response_model=List[UserWithRolesResponse], tags=['Usuarios'])
+def get_all_users_with_roles(
+    db: Session = Depends(get_db), 
+    token: Union[str, dict] = Depends(Portador())
+):
+    try:
+        # Imprimir el token recibido para depuración
+        print(f"Token recibido: {token}")
+        print(f"Tipo de token: {type(token)}")
+        
+        # Manejar caso cuando el token ya está decodificado
+        if isinstance(token, dict):
+            token_data = token
+        else:
+            # Si es un string, decodificar
+            token_data = valida_token(token)
+        
+        # Imprimir datos del token para depuración
+        print(f"Datos del token: {token_data}")
+        
+        user_roles = token_data.get("roles", [])
+        
+        # Verificar si el usuario es admin
+        if "admin" not in user_roles and "administrador" not in user_roles:
+            raise HTTPException(
+                status_code=403, 
+                detail="No tienes permisos para ver todos los usuarios"
+            )
+        
+        # Obtener todos los usuarios
+        users = db.query(models.users.User).all()
+        
+        # Preparar respuesta con roles
+        users_with_roles = []
+        for user in users:
+            # Obtener nombres de roles
+            roles = [rol.Nombre for rol in user.roles] if user.roles else []
+            
+            users_with_roles.append(UserWithRolesResponse(
+                ID=user.ID,
+                Nombre_Usuario=user.Nombre_Usuario,
+                Correo_Electronico=user.Correo_Electronico,
+                Roles=roles,
+                Estatus=user.Estatus.value if user.Estatus else None
+            ))
+        
+        return users_with_roles
+    
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(
+            status_code=401, 
+            detail="Token expirado"
+        )
+    except jwt.InvalidTokenError:
+        raise HTTPException(
+            status_code=401, 
+            detail="Token inválido"
+        )
+    except Exception as e:
+        # Capturar y loguear cualquier error
+        print(f"Error al procesar token: {str(e)}")
+        raise HTTPException(
+            status_code=401, 
+            detail=f"Error de autenticación: {str(e)}"
+        )@user.get('/users-with-roles/', response_model=List[UserWithRolesResponse], tags=['Usuarios'])
+def get_all_users_with_roles(
+    db: Session = Depends(get_db), 
+    token: str = Depends(Portador())
+):
+    try:
+        # Imprimir el token recibido para depuración
+        print(f"Token recibido: {token}")
+        print(f"Tipo de token: {type(token)}")
+        
+        # Decodificar el token para validar roles
+        token_data = valida_token(token)
+        
+        # Imprimir datos del token para depuración
+        print(f"Datos del token: {token_data}")
+        
+        user_roles = token_data.get("roles", [])
+        
+        # Verificar si el usuario es admin
+        if "admin" not in user_roles and "administrador" not in user_roles:
+            raise HTTPException(
+                status_code=403, 
+                detail="No tienes permisos para ver todos los usuarios"
+            )
+        
+        # Obtener todos los usuarios
+        users = db.query(models.users.User).all()
+        
+        # Preparar respuesta con roles
+        users_with_roles = []
+        for user in users:
+            # Obtener nombres de roles
+            roles = [rol.Nombre for rol in user.roles] if user.roles else []
+            
+            users_with_roles.append(UserWithRolesResponse(
+                ID=user.ID,
+                Nombre_Usuario=user.Nombre_Usuario,
+                Correo_Electronico=user.Correo_Electronico,
+                Roles=roles,
+                Estatus=user.Estatus.value if user.Estatus else None
+            ))
+        
+        return users_with_roles
+    
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(
+            status_code=401, 
+            detail="Token expirado"
+        )
+    except jwt.InvalidTokenError:
+        raise HTTPException(
+            status_code=401, 
+            detail="Token inválido"
+        )
+    except Exception as e:
+        # Capturar y loguear cualquier error
+        print(f"Error al procesar token: {str(e)}")
+        raise HTTPException(
+            status_code=401, 
+            detail=f"Error de autenticación: {str(e)}"
+        )# Agregar estas importaciones si no existen
+from typing import List
+from fastapi import HTTPException
+
+# Esquema para la respuesta de usuarios con roles
+class UserWithRolesResponse(BaseModel):
+    ID: int
+    Nombre_Usuario: str
+    Correo_Electronico: str
+    Roles: List[str]
+    Estatus: str
+
+# Nuevo endpoint para obtener todos los usuarios con sus roles (solo para admin)
+@user.get('/users-with-roles/', response_model=List[UserWithRolesResponse], tags=['Usuarios'])
+def get_all_users_with_roles(
+    db: Session = Depends(get_db), 
+    token_str: str = Depends(Portador())
+):
+    try:
+        # Imprimir el token para depuración
+        print(f"Token recibido: {token_str}")
+        print(f"Tipo de token: {type(token_str)}")
+        
+        # Convertir el token a bytes si es necesario
+        if isinstance(token_str, str):
+            token = token_str.encode('utf-8')
+        else:
+            token = token_str
+        
+        # Decodificar el token para validar roles
+        token_data = valida_token(token)
+        
+        # Imprimir datos del token para depuración
+        print(f"Datos del token: {token_data}")
+        
+        user_roles = token_data.get("roles", [])
+        
+        # Verificar si el usuario es admin
+        if "admin" not in user_roles and "administrador" not in user_roles:
+            raise HTTPException(
+                status_code=403, 
+                detail="No tienes permisos para ver todos los usuarios"
+            )
+        
+        # Obtener todos los usuarios
+        users = db.query(models.users.User).all()
+        
+        # Preparar respuesta con roles
+        users_with_roles = []
+        for user in users:
+            # Obtener nombres de roles
+            roles = [rol.Nombre for rol in user.roles] if user.roles else []
+            
+            users_with_roles.append(UserWithRolesResponse(
+                ID=user.ID,
+                Nombre_Usuario=user.Nombre_Usuario,
+                Correo_Electronico=user.Correo_Electronico,
+                Roles=roles,
+                Estatus=user.Estatus.value if user.Estatus else None
+            ))
+        
+        return users_with_roles
+    
+    except Exception as e:
+        # Capturar y loguear cualquier error
+        print(f"Error al procesar token: {str(e)}")
+        raise HTTPException(
+            status_code=401, 
+            detail=f"Error de autenticación: {str(e)}"
+        )
+
+# Esquema para solicitud de cambio de rol
+class ChangeUserRoleRequest(BaseModel):
+    user_id: int
+    new_role_name: str
+
+# Nuevo endpoint para cambiar rol de usuario (solo para admin)
+@user.put('/change-user-role/', tags=['Usuarios'])
+def change_user_role(
+    role_change: ChangeUserRoleRequest,
+    db: Session = Depends(get_db), 
+    token: str = Depends(Portador())
+):
+    print(f"Token recibido: {token}")
+    print(f"Tipo de token: {type(token)}")
+
+    # Si el token ya está decodificado (por el Portador), usarlo directamente
+    if isinstance(token, dict):
+        token_data = token
+    else:
+        try:
+            # Convertir a bytes si es un string
+            if isinstance(token, str):
+                token = token.encode('utf-8')
+            
+            # Decodificar el token
+            token_data = valida_token(token)
+        except Exception as e:
+            print(f"Error al decodificar token: {str(e)}")
+            raise HTTPException(
+                status_code=401, 
+                detail=f"Error de autenticación: {str(e)}"
+            )
+
+    print(f"Datos del token: {token_data}")
+    
+    # Verificar roles del usuario
+    user_roles = token_data.get("roles", [])
+    
+    # Verificar si el usuario es admin
+    if "admin" not in user_roles and "administrador" not in user_roles:
+        raise HTTPException(
+            status_code=403, 
+            detail="No tienes permisos para cambiar roles de usuarios"
+        )
+    
+    # Buscar el usuario
+    user = db.query(models.users.User).filter(models.users.User.ID == role_change.user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    
+    # Buscar el nuevo rol
+    new_role = db.query(models.rols.Rol).filter(models.rols.Rol.Nombre == role_change.new_role_name).first()
+    if not new_role:
+        raise HTTPException(status_code=404, detail="Rol no encontrado")
+    
+    # Limpiar roles existentes
+    user.roles.clear()
+    
+    # Asignar nuevo rol
+    user.roles.append(new_role)
+    
+    # Guardar cambios
+    db.commit()
+    db.refresh(user)
+    
+    return {
+        "message": "Rol de usuario actualizado exitosamente",
+        "user_id": user.ID,
+        "new_role": new_role.Nombre
+    }
