@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy.orm import Session
-from typing import List, Optional
+from typing import List, Optional, Dict
 from config.db import get_db, engine
 from portadortoken import Portador
 import crud.quejas
@@ -8,6 +8,7 @@ import schemas.quejas
 import models.users
 import models.quejas
 import models.clases
+import models.persons
 from datetime import datetime
 
 feedback_router = APIRouter()
@@ -557,3 +558,66 @@ def get_estadisticas_entrenador(
         "tendencia_calificaciones": tendencia_calificaciones,
         "ultimas_quejas": ultimas_quejas
     }
+
+
+# Ruta para que un entrenador vea todas sus propias quejas (sin límite)
+@feedback_router.get('/entrenador/mis-quejas/', response_model=List[dict], tags=['Feedback Entrenador'], dependencies=[Depends(Portador())])
+def read_quejas_entrenador(db: Session = Depends(get_db), token_data = Depends(Portador())):
+    # Obtener el ID del usuario del token
+    user_id = token_data.get("user_id") or token_data.get("ID")
+    
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Token inválido o expirado")
+    
+    # Verificar que el usuario tenga rol de entrenador
+    user = db.query(models.users.User).filter(models.users.User.ID == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    
+    is_entrenador = False
+    for rol in user.roles:
+        if rol.Nombre == "entrenador":
+            is_entrenador = True
+            break
+    
+    if not is_entrenador:
+        raise HTTPException(status_code=403, detail="Solo los entrenadores pueden acceder a este recurso")
+    
+    # Obtener TODAS las quejas del entrenador (sin límite)
+    quejas = db.query(models.quejas.Queja).filter(models.quejas.Queja.Entrenador_ID == user_id).all()
+    
+    # Preparar la respuesta con detalles adicionales
+    resultado = []
+    for queja in quejas:
+        # Obtener información del usuario que hizo la queja
+        usuario = db.query(models.users.User).filter(models.users.User.ID == queja.Usuario_ID).first()
+        
+        # Obtener información personal del usuario que hizo la queja
+        persona = db.query(models.persons.Person).filter(models.persons.Person.Usuario_ID == queja.Usuario_ID).first()
+        
+        # Obtener información de la clase
+        clase = queja.clase  # Usando la relación definida en el modelo
+        
+        # Construir nombre del usuario
+        nombre_completo = "Usuario desconocido"
+        if persona:
+            nombre_completo = f"{persona.Nombre} {persona.Primer_Apellido}"
+            if persona.Segundo_Apellido:
+                nombre_completo += f" {persona.Segundo_Apellido}"
+        elif usuario:
+            nombre_completo = usuario.Nombre_Usuario
+            
+        resultado.append({
+            "id": queja.ID,
+            "usuario_id": queja.Usuario_ID,
+            "nombre_usuario": nombre_completo,
+            "clase_id": queja.Clase_ID,
+            "clase_nombre": clase.Nombre if clase else "Clase desconocida",
+            "calificacion": queja.Calificacion,
+            "comentario": queja.Comentario,
+            "fecha": queja.Fecha_Registro.isoformat(),
+            "fecha_actualizacion": queja.Fecha_Actualizacion.isoformat() if queja.Fecha_Actualizacion else None,
+            "estatus": queja.Estatus
+        })
+    
+    return resultado
