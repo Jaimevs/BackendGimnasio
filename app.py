@@ -8,7 +8,7 @@ from routes.evaluacion_serv import evaluaciones_router
 from routes.servicios import servicios_router
 from routes.promociones import promocion_router
 from routes.opinion_cliente import opinion_cliente_router
-from routes.membresias import membresia
+from routes.membresias import membresias_router
 from routes.servicios_clientes import servicio_cliente
 from routes.ejercicios import ejercicio
 from routes.entrenamientos import entrenamiento
@@ -42,7 +42,7 @@ app.include_router(evaluaciones_router)
 app.include_router(servicios_router)
 app.include_router(promocion_router)
 app.include_router(opinion_cliente_router)
-app.include_router(membresia)
+app.include_router(membresias_router)
 app.include_router(servicio_cliente)
 app.include_router(ejercicio)
 app.include_router(entrenamiento)
