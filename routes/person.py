@@ -8,6 +8,36 @@ from portadortoken import Portador
 from datetime import datetime
 from pydantic import BaseModel
 from typing import Optional
+from fastapi import File, UploadFile, Form
+import base64
+import boto3
+import os
+from botocore.exceptions import NoCredentialsError
+
+# Definir el router al principio del archivo
+person = APIRouter()
+models.persons.Base.metadata.create_all(bind=config.db.engine)
+
+def get_db():
+    db = config.db.SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+# Configuración de AWS S3
+AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID")
+AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
+AWS_REGION = os.getenv("AWS_REGION")
+S3_BUCKET_NAME = os.getenv("S3_BUCKET_NAME")
+
+# Inicializar cliente S3
+s3_client = boto3.client(
+    's3',
+    aws_access_key_id=AWS_ACCESS_KEY_ID,
+    aws_secret_access_key=AWS_SECRET_ACCESS_KEY,
+    region_name=AWS_REGION
+)
 
 # Modelo para la creación/actualización de personas vinculadas a un usuario
 class PersonUserCreate(BaseModel):
@@ -42,15 +72,133 @@ class PersonUserBasicCreate(BaseModel):
 key = Fernet.generate_key()
 f = Fernet(key)
 
-person = APIRouter()
-models.persons.Base.metadata.create_all(bind=config.db.engine)
-
-def get_db():
-    db = config.db.SessionLocal()
+# Endpoint para subir imagen de perfil
+@person.post('/upload-profile-image/', tags=['Perfil de Usuario'])
+async def upload_profile_image(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(Portador())
+):
+    # Validar token y usuario
+    user_id = current_user.get("ID")
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Token inválido: no contiene ID de usuario")
+    
+    # Verificar perfil de usuario
+    user_profile = db.query(models.persons.Person).filter(
+        models.persons.Person.Usuario_ID == user_id
+    ).first()
+    
+    if not user_profile:
+        raise HTTPException(status_code=404, detail="No se ha encontrado el perfil para este usuario")
+    
     try:
-        yield db
-    finally:
-        db.close()
+        # Leer el contenido del archivo
+        file_content = await file.read()
+        
+        # Limitar tamaño de archivo (5MB)
+        if len(file_content) > 5 * 1024 * 1024:
+            raise HTTPException(status_code=413, detail="El archivo es demasiado grande (máximo 5MB)")
+        
+        # Generar nombre único para el archivo
+        file_extension = file.filename.split(".")[-1].lower()
+        
+        # Validar extensiones permitidas
+        allowed_extensions = ['jpg', 'jpeg', 'png', 'gif', 'webp']
+        if file_extension not in allowed_extensions:
+            raise HTTPException(status_code=400, detail=f"Formato de archivo no permitido. Use: {', '.join(allowed_extensions)}")
+        
+        file_name = f"user_{user_id}/profile_{datetime.now().strftime('%Y%m%d%H%M%S')}.{file_extension}"
+        
+        # Subir a S3
+        s3_client.put_object(
+            Bucket=S3_BUCKET_NAME,
+            Key=file_name,
+            Body=file_content,
+            ContentType=file.content_type,
+            ACL='public-read'
+        )
+        
+        # Generar URL de S3
+        s3_url = f"https://{S3_BUCKET_NAME}.s3.{AWS_REGION}.amazonaws.com/{file_name}"
+        
+        # Actualizar perfil de usuario con la URL de la imagen
+        user_profile.Fotografia = s3_url
+        user_profile.Fecha_Actualizacion = datetime.now()
+        db.commit()
+        
+        return {"message": "Imagen subida exitosamente", "image_url": s3_url}
+    
+    except NoCredentialsError:
+        raise HTTPException(status_code=500, detail="Error de credenciales de AWS")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al subir la imagen: {str(e)}")
+
+# Alternativa: Endpoint para subir imagen como Base64
+@person.put('/update-profile-image/', tags=['Perfil de Usuario'])
+async def update_profile_image(
+    image_data: str = Form(...),
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(Portador())
+):
+    # Validar token y usuario
+    user_id = current_user.get("ID")
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Token inválido: no contiene ID de usuario")
+    
+    # Verificar perfil de usuario
+    user_profile = db.query(models.persons.Person).filter(
+        models.persons.Person.Usuario_ID == user_id
+    ).first()
+    
+    if not user_profile:
+        raise HTTPException(status_code=404, detail="No se ha encontrado el perfil para este usuario")
+    
+    try:
+        # Verificar formato base64
+        if not image_data.startswith('data:image'):
+            raise HTTPException(status_code=400, detail="Formato de imagen inválido")
+        
+        # Separar metadatos y datos binarios
+        _, encoded_data = image_data.split(',', 1)
+        
+        # Decodificar base64
+        binary_data = base64.b64decode(encoded_data)
+        
+        # Verificar tamaño
+        if len(binary_data) > 5 * 1024 * 1024:
+            raise HTTPException(status_code=413, detail="La imagen es demasiado grande (máximo 5MB)")
+            
+        # Generar nombre único para el archivo
+        file_name = f"user_{user_id}/profile_{datetime.now().strftime('%Y%m%d%H%M%S')}.jpg"
+        
+        # Subir a S3
+        s3_client.put_object(
+            Bucket=S3_BUCKET_NAME,
+            Key=file_name,
+            Body=binary_data,
+            ContentType='image/jpeg',
+            ACL='public-read'
+        )
+        
+        # Generar URL de S3
+        s3_url = f"https://{S3_BUCKET_NAME}.s3.{AWS_REGION}.amazonaws.com/{file_name}"
+        
+        # Actualizar perfil de usuario con la URL de la imagen
+        user_profile.Fotografia = s3_url
+        user_profile.Fecha_Actualizacion = datetime.now()
+        db.commit()
+        
+        return {"message": "Imagen actualizada exitosamente", "image_url": s3_url}
+    
+    except NoCredentialsError:
+        raise HTTPException(status_code=500, detail="Error de credenciales de AWS")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al actualizar la imagen: {str(e)}")
 
 # Endpoint para que el usuario cree su información personal
 @person.post('/userprofile/', response_model=schemas.persons.Person, tags=['Perfil de Usuario'])
