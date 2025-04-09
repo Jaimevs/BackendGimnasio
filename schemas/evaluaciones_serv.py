@@ -1,27 +1,41 @@
-from typing import List, Union
-from pydantic  import BaseModel
+from typing import Optional, List
+from pydantic import BaseModel
 from datetime import datetime
+from enum import Enum
 
-class Evaluaciones_servBase(BaseModel):
-    Usuario_ID:int
-    Servicios:str
-    Calificacion:str
-    Criterio:str
-    Estatus:bool
+class TipoServicio(str, Enum):
+    SNutricion = "Servicios de nutricion"
+    HP = "Horarios y precios"
+    C = "Comunidad"
+    PE = "Programas de entretenimiento"
+
+class EvaluacionServBase(BaseModel):
+    Servicio_ID: int
+    Tipo_Servicio: TipoServicio
+    Calificacion: int
+    Comentario: Optional[str] = None
+    Estatus: Optional[bool] = True
+
+class EvaluacionServCreate(EvaluacionServBase):
+    pass
+
+class EvaluacionServUpdate(BaseModel):
+    Servicio_ID: Optional[int] = None
+    Tipo_Servicio: Optional[TipoServicio] = None
+    Calificacion: Optional[int] = None
+    Comentario: Optional[str] = None
+    Estatus: Optional[bool] = None
+
+class EvaluacionServ(EvaluacionServBase):
+    ID: int
+    Usuario_ID: int
     Fecha_Registro: datetime
-   
-    
-    
+    Fecha_Actualizacion: Optional[datetime] = None
 
-class Evaluaciones_servCreate(Evaluaciones_servBase):
-    pass
-
-class Evaluaciones_servUpdate(Evaluaciones_servBase):
-    pass
-
-class Evaluaciones_serv(Evaluaciones_servBase):
-    ID:int
     class Config:
         orm_mode = True
+        from_attributes = True
 
-        
+class EvaluacionServDetalle(EvaluacionServ):
+    Servicio_Nombre: Optional[str] = None
+    Usuario_Nombre: Optional[str] = None
